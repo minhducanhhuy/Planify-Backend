@@ -20,7 +20,7 @@ model board_users {
   id       String  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   board_id String? @db.Uuid
   user_id  String? @db.Uuid
-  role     String? @db.VarChar(50)
+  role     BoardRole @default(viewer)
   boards   boards? @relation(fields: [board_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   users    users?  @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
@@ -131,6 +131,7 @@ model tasks {
   due_date           DateTime?            @db.Timestamp(6)
   created_by         String?              @db.Uuid
   created_at         DateTime?            @default(now()) @db.Timestamp(6)
+  is_done            Boolean?             @default(false)
   comments           comments[]
   history_activities history_activities[]
   boards             boards?              @relation(fields: [board_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
@@ -193,7 +194,7 @@ model workspace_users {
   id           String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   workspace_id String?     @db.Uuid
   user_id      String?     @db.Uuid
-  role         String?     @db.VarChar(50)
+  role         WorkspaceRole     @default(member)
   users        users?      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   workspaces   workspaces? @relation(fields: [workspace_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
@@ -212,4 +213,16 @@ model workspaces {
 enum AuthProvider {
   local
   google
+}
+
+enum WorkspaceRole {
+  owner
+  admin
+  member
+}
+
+enum BoardRole {
+  admin
+  editor
+  viewer
 }
