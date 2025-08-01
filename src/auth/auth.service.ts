@@ -21,33 +21,33 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async register(dto: RegisterDto) {
-    const userExists = await this.prisma.users.findUnique({
-      where: { email: dto.email },
-    });
+  //   async register(dto: RegisterDto) {
+  //     const userExists = await this.prisma.users.findUnique({
+  //       where: { email: dto.email },
+  //     });
 
-    if (userExists) {
-      throw new BadRequestException('Email is already registered');
-    }
+  //     if (userExists) {
+  //       throw new BadRequestException('Email is already registered');
+  //     }
 
-    const hashedPassword = await bcrypt.hash(dto.password, 10);
+  //     const hashedPassword = await bcrypt.hash(dto.password, 10);
 
-    const newUser = await this.prisma.users.create({
-      data: {
-        email: dto.email,
-        password: hashedPassword,
-        provider: 'local',
-      },
-    });
+  //     const newUser = await this.prisma.users.create({
+  //       data: {
+  //         email: dto.email,
+  //         password: hashedPassword,
+  //         provider: 'local',
+  //       },
+  //     });
 
-    return {
-      message: 'Account created successfully',
-      user: {
-        id: newUser.id,
-        email: newUser.email,
-      },
-    };
-  }
+  //     return {
+  //       message: 'Account created successfully',
+  //       user: {
+  //         id: newUser.id,
+  //         email: newUser.email,
+  //       },
+  //     };
+  //   }
 
   async login(dto: LoginDto) {
     const user = await this.prisma.users.findUnique({
@@ -106,76 +106,76 @@ export class AuthService {
     };
   }
 
-  async changePassword(userId: string, dto: ChangePasswordDto) {
-    const user = await this.prisma.users.findUnique({ where: { id: userId } });
+  //   async changePassword(userId: string, dto: ChangePasswordDto) {
+  //     const user = await this.prisma.users.findUnique({ where: { id: userId } });
 
-    if (!user || !user.password) {
-      throw new BadRequestException('Tài khoản Google không thể đổi mật khẩu');
-    }
+  //     if (!user || !user.password) {
+  //       throw new BadRequestException('Tài khoản Google không thể đổi mật khẩu');
+  //     }
 
-    const isMatch = await bcrypt.compare(dto.oldPassword, user.password);
-    if (!isMatch) {
-      throw new UnauthorizedException('Mật khẩu cũ không đúng');
-    }
+  //     const isMatch = await bcrypt.compare(dto.oldPassword, user.password);
+  //     if (!isMatch) {
+  //       throw new UnauthorizedException('Mật khẩu cũ không đúng');
+  //     }
 
-    const newHashed = await bcrypt.hash(dto.newPassword, 10);
+  //     const newHashed = await bcrypt.hash(dto.newPassword, 10);
 
-    await this.prisma.users.update({
-      where: { id: userId },
-      data: { password: newHashed },
-    });
+  //     await this.prisma.users.update({
+  //       where: { id: userId },
+  //       data: { password: newHashed },
+  //     });
 
-    return { message: 'Đổi mật khẩu thành công' };
-  }
+  //     return { message: 'Đổi mật khẩu thành công' };
+  //   }
 
-  async forgotPassword(dto: ForgotPasswordDto) {
-    const user = await this.prisma.users.findUnique({
-      where: { email: dto.email },
-    });
-    if (!user) throw new NotFoundException('User not found');
+  //   async forgotPassword(dto: ForgotPasswordDto) {
+  //     const user = await this.prisma.users.findUnique({
+  //       where: { email: dto.email },
+  //     });
+  //     if (!user) throw new NotFoundException('User not found');
 
-    const token = randomUUID();
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 phút
+  //     const token = randomUUID();
+  //     const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 phút
 
-    await this.prisma.password_reset_tokens.create({
-      data: {
-        user_id: user.id,
-        token,
-        expires_at: expiresAt,
-      },
-    });
+  //     await this.prisma.password_reset_tokens.create({
+  //       data: {
+  //         user_id: user.id,
+  //         token,
+  //         expires_at: expiresAt,
+  //       },
+  //     });
 
-    // TODO: gửi email thực tế, ở đây log ra
-    //  console.log(
-    //    `Reset link: https://yourdomain.com/reset-password?token=${token}`,
-    //  );
+  //     // TODO: gửi email thực tế, ở đây log ra
+  //     //  console.log(
+  //     //    `Reset link: https://yourdomain.com/reset-password?token=${token}`,
+  //     //  );
 
-    return { message: 'Gửi link forgot thành công' };
-  }
+  //     return { message: 'Gửi link forgot thành công' };
+  //   }
 
-  async resetPassword(dto: ResetPasswordDto) {
-    const resetToken = await this.prisma.password_reset_tokens.findUnique({
-      where: { token: dto.token },
-      include: { user: true },
-    });
+  //   async resetPassword(dto: ResetPasswordDto) {
+  //     const resetToken = await this.prisma.password_reset_tokens.findUnique({
+  //       where: { token: dto.token },
+  //       include: { user: true },
+  //     });
 
-    if (!resetToken || resetToken.used || new Date() > resetToken.expires_at) {
-      throw new BadRequestException('Token is invalid or expired');
-    }
+  //     if (!resetToken || resetToken.used || new Date() > resetToken.expires_at) {
+  //       throw new BadRequestException('Token is invalid or expired');
+  //     }
 
-    const passwordHash = await bcrypt.hash(dto.newPassword, 10);
+  //     const passwordHash = await bcrypt.hash(dto.newPassword, 10);
 
-    await this.prisma.$transaction([
-      this.prisma.users.update({
-        where: { id: resetToken.user_id },
-        data: { password: passwordHash },
-      }),
-      this.prisma.password_reset_tokens.update({
-        where: { token: dto.token },
-        data: { used: true },
-      }),
-    ]);
+  //     await this.prisma.$transaction([
+  //       this.prisma.users.update({
+  //         where: { id: resetToken.user_id },
+  //         data: { password: passwordHash },
+  //       }),
+  //       this.prisma.password_reset_tokens.update({
+  //         where: { token: dto.token },
+  //         data: { used: true },
+  //       }),
+  //     ]);
 
-    return { message: 'Reset mật khẩu thành công' };
-  }
+  //     return { message: 'Reset mật khẩu thành công' };
+  //   }
 }
