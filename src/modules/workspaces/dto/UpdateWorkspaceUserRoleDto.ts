@@ -1,11 +1,19 @@
-import { IsEnum, IsNotEmpty, IsString } from 'class-validator';
+// dto/UpdateWorkspaceUserRoleDto.ts
+import { IsArray, ValidateNested, IsEmail, IsEnum } from 'class-validator';
+import { Type } from 'class-transformer';
 import { WorkspaceRole } from '@prisma/client';
 
-export class UpdateWorkspaceUserRoleDto {
-  @IsNotEmpty()
-  @IsString()
-  userId: string;
+class UserRoleItem {
+  @IsEmail()
+  email: string;
 
   @IsEnum(WorkspaceRole)
   role: WorkspaceRole;
+}
+
+export class UpdateWorkspaceUserRoleDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UserRoleItem)
+  users: UserRoleItem[];
 }

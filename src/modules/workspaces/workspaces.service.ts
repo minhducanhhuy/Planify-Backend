@@ -7,6 +7,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateWorkspaceUserRoleDto } from './dto/UpdateWorkspaceUserRoleDto';
+import { WorkspaceRole } from '@prisma/client';
+import { AddWorkspaceUsersDto } from './dto/AddWorkspaceUsersDto';
 
 @Injectable()
 export class WorkspacesService {
@@ -36,23 +38,28 @@ export class WorkspacesService {
           },
         },
       },
-      include: {
-        workspace_users: {
-          include: {
-            users: {
-              select: {
-                full_name: true,
-                email: true,
-                avatar_url: true,
-              },
-            },
-          },
-        },
+      select: {
+        id: true,
+        name: true,
+        created_by: true,
       },
     });
   }
 
-  async getWorkspaceMembers(workspaceId: string) {
+  async getWorkspaceMembers(workspaceId: string, userId: string) {
+    const user = await this.prisma.workspace_users.findUnique({
+      where: {
+        workspace_id_user_id: {
+          workspace_id: workspaceId,
+          user_id: userId,
+        },
+      },
+    });
+
+    if (!user) {
+      throw new ForbiddenException('User does not belong to this workspace');
+    }
+
     const members = await this.prisma.workspace_users.findMany({
       where: {
         workspace_id: workspaceId,
@@ -98,38 +105,78 @@ export class WorkspacesService {
     return workspace;
   }
 
-  async inviteUser(
+  async addUsersByEmail(
     workspaceId: string,
     currentUserId: string,
-    targetUserId: string,
+    dto: AddWorkspaceUsersDto,
   ) {
-    // Không cho tự mời chính mình
-    if (currentUserId === targetUserId) {
-      throw new BadRequestException(
-        'You cannot invite yourself to the workspace',
-      );
-    }
+    return await this.prisma.$transaction(async (tx) => {
+      const current = await this.prisma.workspace_users.findUnique({
+        where: {
+          workspace_id_user_id: {
+            user_id: currentUserId,
+            workspace_id: workspaceId,
+          },
+        },
+      });
 
-    // Kiểm tra xem user đã có trong workspace chưa
-    const existing = await this.prisma.workspace_users.findFirst({
-      where: {
-        workspace_id: workspaceId,
-        user_id: targetUserId,
-      },
-    });
+      if (!current) {
+        throw new Error('Người dùng không tồn tại trong workspace.');
+      }
 
-    if (existing) {
-      throw new BadRequestException(
-        'User is already a member of this workspace',
-      );
-    }
+      if (current.role === 'member') {
+        throw new Error('Bạn không có quyền thêm người khác.');
+      }
 
-    // Nếu hợp lệ thì thêm
-    return this.prisma.workspace_users.create({
-      data: {
-        workspace_id: workspaceId,
-        user_id: targetUserId,
-      },
+      const workspace = await this.prisma.workspaces.findUnique({
+        where: { id: workspaceId },
+      });
+
+      if (!workspace) throw new NotFoundException('Workspace not found');
+
+      const addedUsers: { email: string; role: WorkspaceRole }[] = [];
+      const existingMembers: { email: string }[] = [];
+      for (const userData of dto.users) {
+        const user = await tx.users.findUnique({
+          where: { email: userData.email },
+        });
+
+        if (!user) continue;
+
+        const existingMember = await tx.workspace_users.findUnique({
+          where: {
+            workspace_id_user_id: {
+              workspace_id: workspaceId,
+              user_id: user.id,
+            },
+          },
+        });
+
+        if (existingMember) {
+          existingMembers.push({
+            email: userData.email,
+          });
+          continue;
+        }
+
+        const newUsser = await tx.workspace_users.create({
+          data: {
+            workspace_id: workspaceId,
+            user_id: user.id,
+            role: userData.role ?? 'member',
+          },
+        });
+
+        addedUsers.push({
+          email: user.email,
+          role: newUsser.role ?? 'member',
+        });
+      }
+
+      return {
+        message: `Added ${addedUsers.length} users to Workspace`,
+        alreadyInWorkspace: existingMembers,
+      };
     });
   }
 
@@ -149,7 +196,7 @@ export class WorkspacesService {
     });
   }
 
-  async updateUserRole(
+  async updateUsersRole(
     workspaceId: string,
     currentUserId: string,
     dto: UpdateWorkspaceUserRoleDto,
@@ -163,116 +210,167 @@ export class WorkspacesService {
       },
     });
 
-    const target = await this.prisma.workspace_users.findUnique({
-      where: {
-        workspace_id_user_id: {
-          workspace_id: workspaceId,
-          user_id: dto.userId,
-        },
-      },
-    });
-
-    console.log('current:', current);
-    console.log('target:', target);
-
-    if (!target || !current)
-      throw new Error('Người dùng không tồn tại trong workspace.');
-
-    if (target.role === 'owner') {
-      throw new Error('Không thể thay đổi vai trò của Owner.');
-    }
-
-    if (current.role === 'admin' && target.role === 'admin') {
-      throw new Error('Admin không thể thay đổi vai trò của Admin khác.');
+    if (!current) {
+      throw new Error('Người cập nhật không tồn tại trong workspace.');
     }
 
     if (current.role === 'member') {
       throw new Error('Bạn không có quyền thay đổi vai trò người khác.');
     }
 
-    if (currentUserId === target.user_id) {
-      throw new BadRequestException(
-        'Không thể tự cập nhật vai trò của bản thân',
-      );
-    }
+    const updatedUsers: { email: string; newRole: WorkspaceRole }[] = [];
 
-    return this.prisma.workspace_users.update({
-      where: {
-        workspace_id_user_id: {
-          user_id: dto.userId,
-          workspace_id: workspaceId,
-        },
-      },
-      data: {
-        role: dto.role,
-      },
+    await this.prisma.$transaction(async (tx) => {
+      for (const user of dto.users) {
+        const userRecord = await tx.users.findUnique({
+          where: { email: user.email },
+        });
+
+        if (!userRecord) continue;
+
+        if (userRecord.id === currentUserId) {
+          throw new BadRequestException(
+            'Không thể tự cập nhật vai trò của bản thân',
+          );
+        }
+
+        const target = await tx.workspace_users.findUnique({
+          where: {
+            workspace_id_user_id: {
+              user_id: userRecord.id,
+              workspace_id: workspaceId,
+            },
+          },
+        });
+
+        if (!target) continue;
+
+        if (target.role === 'owner') {
+          throw new Error(
+            `Không thể thay đổi vai trò của Owner: ${user.email}`,
+          );
+        }
+
+        if (current.role === 'admin' && target.role === 'admin') {
+          throw new Error(
+            `Admin không thể thay đổi vai trò của Admin: ${user.email}`,
+          );
+        }
+
+        await tx.workspace_users.update({
+          where: {
+            workspace_id_user_id: {
+              user_id: userRecord.id,
+              workspace_id: workspaceId,
+            },
+          },
+          data: {
+            role: user.role,
+          },
+        });
+
+        updatedUsers.push({
+          email: user.email,
+          newRole: user.role,
+        });
+      }
     });
-  }
 
-  async kickUser(
+    return {
+      message: 'Cập nhật vai trò thành công cho một số người dùng.',
+      updated: updatedUsers,
+    };
+  }
+  async kickUsersByEmail(
     workspaceId: string,
     currentUserId: string,
-    targetUserId: string,
+    targetEmails: string[],
   ) {
-    const current = await this.prisma.workspace_users.findUnique({
-      where: {
-        workspace_id_user_id: {
-          user_id: currentUserId,
-          workspace_id: workspaceId,
+    return this.prisma.$transaction(async (tx) => {
+      const current = await tx.workspace_users.findUnique({
+        where: {
+          workspace_id_user_id: {
+            workspace_id: workspaceId,
+            user_id: currentUserId,
+          },
         },
-      },
-    });
+      });
 
-    const target = await this.prisma.workspace_users.findUnique({
-      where: {
-        workspace_id_user_id: {
-          workspace_id: workspaceId,
-          user_id: targetUserId,
+      if (!current) throw new Error('Bạn không thuộc workspace này.');
+
+      if (current.role === 'member') {
+        throw new Error('Bạn không có quyền xóa người khác.');
+      }
+
+      // Lấy users theo email
+      const users = await tx.users.findMany({
+        where: {
+          email: { in: targetEmails },
         },
-      },
-    });
+        select: { id: true, email: true },
+      });
 
-    //  console.log('Xoá user', {
-    //    workspaceId,
-    //    currentUserId,
-    //    targetUserId,
-    //  });
+      if (!users.length) {
+        throw new BadRequestException('Không tìm thấy người dùng hợp lệ.');
+      }
 
-    //  console.log('sau khi tìm ', {
-    //    current,
-    //    target,
-    //  });
-    if (!target || !current)
-      throw new Error('Người dùng không tồn tại trong workspace.');
+      const kickedEmails: string[] = [];
+      for (const user of users) {
+        if (user.id === currentUserId) {
+          continue; // không cho tự kick
+        }
 
-    // Không cho xóa owner
-    if (target.role === 'owner') {
-      throw new Error('Không thể xóa Owner khỏi workspace.');
-    }
+        const target = await tx.workspace_users.findUnique({
+          where: {
+            workspace_id_user_id: {
+              workspace_id: workspaceId,
+              user_id: user.id,
+            },
+          },
+        });
 
-    // Admin không được xóa Admin khác
-    if (current.role === 'admin' && target.role === 'admin') {
-      throw new Error('Admin không thể xóa Admin khác.');
-    }
+        if (!target) continue;
 
-    // Member không được quyền xóa ai cả
-    if (current.role === 'member') {
-      throw new Error('Bạn không có quyền xóa người khác.');
-    }
+        if (target.role === 'owner') {
+          throw new Error(`Không thể xóa Owner: ${user.email}`);
+        }
 
-    if (currentUserId === targetUserId) {
-      throw new BadRequestException(
-        'Không thể tự xoá chính mình khỏi workspace',
-      );
-    }
+        if (target.role === 'admin' && current.role !== 'owner') {
+          throw new Error(`Chỉ Owner mới được xóa Admin: ${user.email}`);
+        }
 
-    return this.prisma.workspace_users.delete({
-      where: {
-        workspace_id_user_id: {
-          user_id: targetUserId,
-          workspace_id: workspaceId,
-        },
-      },
+        // 1. Xóa khỏi board_users trong các board thuộc workspace
+        const boardsInWorkspace = await tx.boards.findMany({
+          where: { workspace_id: workspaceId },
+          select: { id: true },
+        });
+
+        const boardIds = boardsInWorkspace.map((b) => b.id);
+
+        await tx.board_users.deleteMany({
+          where: {
+            user_id: user.id,
+            board_id: { in: boardIds },
+          },
+        });
+
+        // 2. Xóa khỏi workspace_users
+        await tx.workspace_users.delete({
+          where: {
+            workspace_id_user_id: {
+              workspace_id: workspaceId,
+              user_id: user.id,
+            },
+          },
+        });
+
+        kickedEmails.push(user.email);
+      }
+
+      return {
+        message: `Đã xóa ${kickedEmails.length} người khỏi workspace`,
+        kicked: kickedEmails,
+      };
     });
   }
 }

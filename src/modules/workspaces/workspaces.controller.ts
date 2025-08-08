@@ -9,13 +9,15 @@ import {
   Param,
   Delete,
   UseGuards,
+  UnauthorizedException,
 } from '@nestjs/common';
-import { WorkspacesService } from './workspaces.service';
-import { JwtAuthGuard } from '../../auth/jwt-auth.guard'; // nếu có
 import { Request } from 'express';
-import { InviteUserDto } from './dto/InviteUserDto';
+import { WorkspacesService } from './workspaces.service';
+import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { AddWorkspaceUsersDto } from './dto/AddWorkspaceUsersDto';
 import { CreateWorkspaceDto } from './dto/CreateWorkspaceDto';
 import { UpdateWorkspaceUserRoleDto } from './dto/UpdateWorkspaceUserRoleDto';
+import { KickUsersDto } from './dto/KickUsersDto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('workspaces')
@@ -23,63 +25,92 @@ export class WorkspacesController {
   constructor(private readonly workspacesService: WorkspacesService) {}
 
   @Post('')
-  async create(@Body() dto: CreateWorkspaceDto, @Req() req) {
-    return this.workspacesService.createWorkspace(dto.name, req.user.id);
+  async create(@Body() dto: CreateWorkspaceDto, @Req() req: Request) {
+    if (!req.user) {
+      throw new UnauthorizedException('User not found');
+    }
+    const userId = req.user.id;
+    return this.workspacesService.createWorkspace(dto.name, userId);
   }
 
-  @Get('my')
+  @Get('myWorkspace')
   async getMyWorkspaces(@Req() req: Request) {
-    const user = req.user as any;
-    return this.workspacesService.getUserWorkspaces(user.id);
+    if (!req.user) {
+      throw new UnauthorizedException('User not found');
+    }
+    const userId = req.user.id;
+    return this.workspacesService.getUserWorkspaces(userId);
   }
 
   @Get(':id')
-  async getWorkspaceById(@Param('id') id: string, @Req() req) {
+  async getWorkspaceById(@Param('id') id: string, @Req() req: Request) {
+    if (!req.user) {
+      throw new UnauthorizedException('User not found');
+    }
     const userId = req.user.id;
     return this.workspacesService.getWorkspaceById(id, userId);
   }
 
   @Get(':workspaceId/members')
-  async getMembers(@Param('workspaceId') workspaceId: string) {
-    return this.workspacesService.getWorkspaceMembers(workspaceId);
+  async getMembers(
+    @Param('workspaceId') workspaceId: string,
+    @Req() req: Request,
+  ) {
+    if (!req.user) {
+      throw new UnauthorizedException('User not found');
+    }
+    const userId = req.user.id;
+    return this.workspacesService.getWorkspaceMembers(workspaceId, userId);
   }
 
-  @Post(':id/invite')
-  async invite(
-    @Param('id') id: string,
-    @Body() dto: InviteUserDto,
-    @Req() req,
+  // workspaces.controller.ts
+  @Post(':id/add')
+  async addMany(
+    @Param('id') workspaceId: string,
+    @Body() dto: AddWorkspaceUsersDto,
+    @Req() req: Request,
   ) {
-    return this.workspacesService.inviteUser(id, req.user.id, dto.userId);
+    if (!req.user) {
+      throw new UnauthorizedException('User not found');
+    }
+    const userId = req.user.id;
+    return this.workspacesService.addUsersByEmail(workspaceId, userId, dto);
   }
 
   @Delete(':id')
-  async delete(@Param('id') id: string, @Req() req) {
-    return this.workspacesService.deleteWorkspace(id, req.user.id);
+  async delete(@Param('id') id: string, @Req() req: Request) {
+    if (!req.user) {
+      throw new UnauthorizedException('User not found');
+    }
+    const userId = req.user.id;
+    return this.workspacesService.deleteWorkspace(id, userId);
   }
 
   // PATCH /workspaces/:id/role
   @Patch(':id/role')
-  async updateUserRole(
+  async updateUsersRole(
     @Param('id') workspaceId: string,
     @Body() dto: UpdateWorkspaceUserRoleDto,
-    @Req() req,
+    @Req() req: Request,
   ) {
-    return this.workspacesService.updateUserRole(workspaceId, req.user.id, dto);
+    if (!req.user) {
+      throw new UnauthorizedException('User not found');
+    }
+    const userId = req.user.id;
+    return this.workspacesService.updateUsersRole(workspaceId, userId, dto);
   }
 
-  // DELETE /workspaces/:id/kick/:userId
-  @Delete(':id/kick/:userId')
-  async kickUser(
+  @Delete(':id/kick')
+  async kickUsers(
     @Param('id') workspaceId: string,
-    @Param('userId') targetUserId: string,
-    @Req() req,
+    @Body() dto: KickUsersDto,
+    @Req() req: Request,
   ) {
-    const currentUserId = req.user.id;
-    return this.workspacesService.kickUser(
-      workspaceId,
-      currentUserId,
-      targetUserId,
-    );
+    if (!req.user) {
+      throw new UnauthorizedException('User not found');
+    }
+    const userId = req.user.id;
+    const emails = dto.users.map((user) => user.email);
+    return this.workspacesService.kickUsersByEmail(workspaceId, userId, emails);
   }
 }

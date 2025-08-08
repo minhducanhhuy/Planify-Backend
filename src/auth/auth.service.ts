@@ -66,7 +66,7 @@ export class AuthService {
     const token = await this.jwtService.signAsync(
       { sub: user.id },
       {
-        expiresIn: dto.remember ? '30d' : '1h', // 👈 thời hạn tùy theo rememberMe
+        expiresIn: dto.remember ? '30d' : '30d', // 8h 👈 thời hạn tùy theo rememberMe
       },
     );
 
@@ -95,7 +95,10 @@ export class AuthService {
       });
     }
 
-    const token = await this.jwtService.signAsync({ sub: user.id });
+    const token = await this.jwtService.signAsync({
+      sub: user.id,
+      email: user.email,
+    });
 
     return {
       access_token: token,
