@@ -115,6 +115,19 @@ export class BoardsController {
     );
   }
 
+  @Delete(':id')
+  async deleteBoard(
+    @Param('workspaceId') workspaceId: string,
+    @Param('id') boardId: string,
+    @Req() req: Request,
+  ) {
+    if (!req.user) {
+      throw new UnauthorizedException('User not found');
+    }
+    const userId = req.user.id;
+    return this.boardsService.deleteBoard(workspaceId, boardId, userId);
+  }
+
   @Delete(':id/kick')
   async kickUsers(
     @Param('workspaceId') workspaceId: string,
@@ -128,6 +141,19 @@ export class BoardsController {
       req.user.id,
       dto,
     );
+  }
+
+  @Delete(':id/leave')
+  async leaveWorkspace(
+    @Param('workspaceId') workspaceId: string,
+    @Param('id') boardId: string,
+    @Req() req: Request,
+  ) {
+    if (!req.user) {
+      throw new UnauthorizedException('User not found');
+    }
+    const userId = req.user.id;
+    return this.boardsService.leaveBoard(workspaceId, boardId, userId);
   }
 
   @Patch(':id/name')

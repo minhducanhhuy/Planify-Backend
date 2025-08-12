@@ -35,6 +35,20 @@ export class ListsController {
     return this.listsService.createList(dto, userId, boardId);
   }
 
+  @Get(':id')
+  async getListById(
+    @Param('boardId') boardId: string,
+    @Param('id') listId: string,
+    @Req() req: Request,
+  ) {
+    if (!req.user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const userId = req.user.id;
+    return this.listsService.getListById(userId, boardId, listId);
+  }
+
   @Get('myList')
   async getAllList(@Param('boardId') boardId: string, @Req() req: Request) {
     if (!req.user) {

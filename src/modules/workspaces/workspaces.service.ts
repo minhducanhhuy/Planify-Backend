@@ -180,19 +180,36 @@ export class WorkspacesService {
     });
   }
 
-  async deleteWorkspace(workspace_id: string, user_id: string) {
-    // Kiểm tra quyền người dùng
-    const member = await this.prisma.workspace_users.findFirst({
-      where: { workspace_id, user_id },
-    });
+  async deleteWorkspace(workspaceId: string, userId: string) {
+    return await this.prisma.$transaction(async (tx) => {
+      // Kiểm tra quyền người dùng
+      const member = await tx.workspace_users.findFirst({
+        where: { workspace_id: workspaceId, user_id: userId },
+      });
 
-    if (!member || member.role !== 'owner') {
-      throw new ForbiddenException('Bạn không có quyền xóa workspace này');
-    }
+      if (!member || member.role !== 'owner') {
+        throw new ForbiddenException('Bạn không có quyền xóa workspace này');
+      }
 
-    // Xóa luôn các quan hệ liên quan nếu cần
-    return this.prisma.workspaces.delete({
-      where: { id: workspace_id },
+      const memberCount = await tx.workspace_users.count({
+        where: {
+          workspace_id: workspaceId,
+        },
+      });
+
+      if (memberCount >= 1) {
+        throw new Error(
+          "Can't delete this workspace when have other users in workspace",
+        );
+      }
+      // Xóa luôn các quan hệ liên quan nếu cần
+      await tx.workspaces.delete({
+        where: { id: workspaceId },
+      });
+
+      return {
+        message: `${workspaceId} has deleted successful`,
+      };
     });
   }
 
@@ -201,86 +218,106 @@ export class WorkspacesService {
     currentUserId: string,
     dto: UpdateWorkspaceUserRoleDto,
   ) {
-    const current = await this.prisma.workspace_users.findUnique({
-      where: {
-        workspace_id_user_id: {
-          user_id: currentUserId,
-          workspace_id: workspaceId,
+    return await this.prisma.$transaction(async (tx) => {
+      const currentUser = await tx.workspace_users.findUnique({
+        where: {
+          workspace_id_user_id: {
+            user_id: currentUserId,
+            workspace_id: workspaceId,
+          },
         },
-      },
-    });
+      });
 
-    if (!current) {
-      throw new Error('Người cập nhật không tồn tại trong workspace.');
-    }
+      if (!currentUser) {
+        throw new Error('Người cập nhật không tồn tại trong workspace.');
+      }
 
-    if (current.role === 'member') {
-      throw new Error('Bạn không có quyền thay đổi vai trò người khác.');
-    }
+      if (currentUser.role === 'member') {
+        throw new Error('Bạn không có quyền thay đổi vai trò người khác.');
+      }
 
-    const updatedUsers: { email: string; newRole: WorkspaceRole }[] = [];
+      const updatedUsers: { email: string; newRole: WorkspaceRole }[] = [];
 
-    await this.prisma.$transaction(async (tx) => {
-      for (const user of dto.users) {
-        const userRecord = await tx.users.findUnique({
-          where: { email: user.email },
+      for (const userUpdate of dto.users) {
+        const userTargetRecord = await tx.users.findUnique({
+          where: { email: userUpdate.email },
         });
 
-        if (!userRecord) continue;
+        if (!userTargetRecord) continue;
 
-        if (userRecord.id === currentUserId) {
+        if (userTargetRecord.id === currentUserId) {
           throw new BadRequestException(
             'Không thể tự cập nhật vai trò của bản thân',
           );
         }
 
-        const target = await tx.workspace_users.findUnique({
-          where: {
-            workspace_id_user_id: {
-              user_id: userRecord.id,
-              workspace_id: workspaceId,
+        const userTargetRecordInWorkspace = await tx.workspace_users.findUnique(
+          {
+            where: {
+              workspace_id_user_id: {
+                user_id: userTargetRecord.id,
+                workspace_id: workspaceId,
+              },
             },
           },
-        });
+        );
 
-        if (!target) continue;
+        if (!userTargetRecordInWorkspace) continue;
 
-        if (target.role === 'owner') {
+        if (userTargetRecordInWorkspace.role === 'owner') {
           throw new Error(
-            `Không thể thay đổi vai trò của Owner: ${user.email}`,
+            `Không thể thay đổi vai trò của Owner: ${userUpdate.email}`,
           );
         }
 
-        if (current.role === 'admin' && target.role === 'admin') {
+        if (
+          currentUser.role === 'admin' &&
+          userTargetRecordInWorkspace.role === 'admin'
+        ) {
           throw new Error(
-            `Admin không thể thay đổi vai trò của Admin: ${user.email}`,
+            `Admin không thể thay đổi vai trò của Admin: ${userUpdate.email}`,
           );
+        }
+
+        if (
+          userTargetRecordInWorkspace.role === 'admin' &&
+          userUpdate.role === 'member'
+        ) {
+          await tx.board_users.deleteMany({
+            where: {
+              boards: {
+                workspace_id: workspaceId,
+              },
+              user_id: userTargetRecord.id,
+            },
+          });
         }
 
         await tx.workspace_users.update({
           where: {
             workspace_id_user_id: {
-              user_id: userRecord.id,
+              user_id: userTargetRecord.id,
               workspace_id: workspaceId,
             },
           },
           data: {
-            role: user.role,
+            role: userUpdate.role,
           },
         });
 
         updatedUsers.push({
-          email: user.email,
-          newRole: user.role,
+          email: userUpdate.email,
+          newRole: userUpdate.role,
         });
       }
-    });
 
-    return {
-      message: 'Cập nhật vai trò thành công cho một số người dùng.',
-      updated: updatedUsers,
-    };
+      return {
+        message: 'Cập nhật vai trò thành công cho một số người dùng.',
+        updated: updatedUsers,
+      };
+    });
   }
+
   async kickUsersByEmail(
     workspaceId: string,
     currentUserId: string,
@@ -370,6 +407,65 @@ export class WorkspacesService {
       return {
         message: `Đã xóa ${kickedEmails.length} người khỏi workspace`,
         kicked: kickedEmails,
+      };
+    });
+  }
+
+  async leaveWorkspace(workspaceId: string, currentUserId: string) {
+    return await this.prisma.$transaction(async (tx) => {
+      const user = await tx.workspace_users.findUnique({
+        where: {
+          workspace_id_user_id: {
+            workspace_id: workspaceId,
+            user_id: currentUserId,
+          },
+        },
+      });
+
+      if (!user) {
+        throw new Error('User not found in workspace');
+      }
+
+      if (user.role === 'admin' || user.role === 'member') {
+        // Xóa tất cả các bản ghi board_users trong workspace này của user hiện tại
+        await tx.board_users.deleteMany({
+          where: {
+            boards: {
+              workspace_id: workspaceId,
+            },
+            user_id: currentUserId,
+          },
+        });
+
+        // Xóa bản ghi workspace_users tương ứng
+        await tx.workspace_users.delete({
+          where: {
+            workspace_id_user_id: {
+              workspace_id: workspaceId,
+              user_id: currentUserId,
+            },
+          },
+        });
+      } else if (user.role === 'owner') {
+        // Kiểm tra có đúng 1 thành viên trong workspace không (chính là owner)
+        const memberCount = await tx.workspace_users.count({
+          where: {
+            workspace_id: workspaceId,
+          },
+        });
+
+        if (memberCount >= 1) {
+          throw new Error("Can't leave when have other users in workspace");
+        }
+
+        await tx.workspaces.delete({
+          where: {
+            id: workspaceId,
+          },
+        });
+      }
+      return {
+        member: `${currentUserId} đã rời workspace`,
       };
     });
   }

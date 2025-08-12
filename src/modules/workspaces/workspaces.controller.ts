@@ -78,7 +78,7 @@ export class WorkspacesController {
   }
 
   @Delete(':id')
-  async delete(@Param('id') id: string, @Req() req: Request) {
+  async deleteWorkspace(@Param('id') id: string, @Req() req: Request) {
     if (!req.user) {
       throw new UnauthorizedException('User not found');
     }
@@ -112,5 +112,14 @@ export class WorkspacesController {
     const userId = req.user.id;
     const emails = dto.users.map((user) => user.email);
     return this.workspacesService.kickUsersByEmail(workspaceId, userId, emails);
+  }
+
+  @Delete(':id/leave')
+  async leaveWorkspace(@Param('id') workspaceId: string, @Req() req: Request) {
+    if (!req.user) {
+      throw new UnauthorizedException('User not found');
+    }
+    const userId = req.user.id;
+    return this.workspacesService.leaveWorkspace(workspaceId, userId);
   }
 }

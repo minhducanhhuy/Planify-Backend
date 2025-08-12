@@ -1,5 +1,5 @@
 // dto/update-list-position.dto.ts
-import { IsOptional, IsUUID, IsNotEmpty } from 'class-validator';
+import { IsOptional, IsUUID } from 'class-validator';
 
 export class UpdateListPositionDto {
   @IsOptional()

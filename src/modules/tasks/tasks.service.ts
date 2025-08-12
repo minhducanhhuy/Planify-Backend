@@ -3,15 +3,20 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { PrismaService } from 'src/modules/prisma/prisma.service';
-import { CreateListDto } from './dto/CreateListDto';
-import { UpdateListPositionDto } from './dto/UpdateListPositionDto';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateTaskDto } from './dto/CreateTaskDto';
+import { UpdateTaskPositionDto } from './dto/UpdateTaskPositionDto';
 
 @Injectable()
-export class ListsService {
+export class TasksService {
   constructor(private prisma: PrismaService) {}
 
-  async createList(dto: CreateListDto, userId: string, boardId: string) {
+  async createTask(
+    boardId: string,
+    listId: string,
+    dto: CreateTaskDto,
+    userId: string,
+  ) {
     const user = await this.prisma.board_users.findUnique({
       where: {
         board_id_user_id: {
@@ -30,71 +35,54 @@ export class ListsService {
         'User do not have enough authority to create a board',
       );
 
-    const currentListCount = await this.prisma.lists.count({
-      where: { board_id: boardId },
+    const currentTaskCount = await this.prisma.tasks.count({
+      where: { list_id: listId },
     });
 
-    return this.prisma.lists.create({
+    return this.prisma.tasks.create({
       data: {
-        name: dto.name,
+        list_id: listId,
         board_id: boardId,
-        position: currentListCount + 1,
+        title: dto.name,
+        position: (currentTaskCount + 1) * 100,
+        created_by: userId,
       },
     });
   }
 
-  async getAllList(userId: string, boardId: string) {
+  async getTaskById(boardId: string, taskId: string, userId: string) {
     const canAccess = await this.prisma.board_users.findFirst({
       where: { user_id: userId, board_id: boardId },
     });
     if (!canAccess)
       throw new UnauthorizedException('this user can not access to this board');
 
-    return this.prisma.lists.findMany({
-      where: { board_id: boardId },
-    });
-  }
-
-  async deleteList(listId: string, boardId: string, userId: string) {
-    const user = await this.prisma.board_users.findUnique({
+    return this.prisma.tasks.findUnique({
       where: {
-        board_id_user_id: {
-          board_id: boardId,
-          user_id: userId,
-        },
+        id: taskId,
       },
     });
+  }
 
-    if (!user) throw new Error('User not found');
-
-    if (user.role !== 'editor')
-      throw new ForbiddenException('Can not edit this board');
-
-    const list = await this.prisma.lists.findUnique({
-      where: { id: listId },
+  async getAllTaskInList(boardId: string, listId: string, userId: string) {
+    const canAccess = await this.prisma.board_users.findFirst({
+      where: { user_id: userId, board_id: boardId },
     });
+    if (!canAccess)
+      throw new UnauthorizedException('this user can not access to this board');
 
-    if (!list) {
-      throw new Error('List not found');
-    }
-
-    // Transaction để đảm bảo xóa đồng bộ
-    return this.prisma.$transaction(async (tx) => {
-      await tx.tasks.deleteMany({
-        where: { list_id: listId },
-      });
-
-      return tx.lists.delete({
-        where: { id: listId },
-      });
+    return this.prisma.tasks.findMany({
+      where: {
+        list_id: listId,
+      },
     });
   }
 
-  async setNameList(
-    listId: string,
+  async setNameTask(
     boardId: string,
+    taskId: string,
+    dto: CreateTaskDto,
     userId: string,
-    dto: CreateListDto,
   ) {
     return await this.prisma.$transaction(async (tx) => {
       const user = await tx.board_users.findUnique({
@@ -111,31 +99,62 @@ export class ListsService {
       if (user.role !== 'editor')
         throw new ForbiddenException('Can not edit this board');
 
-      const list = await tx.lists.findUnique({
-        where: { id: listId },
+      const task = await tx.tasks.findUnique({
+        where: { id: taskId },
       });
 
-      if (!list) {
-        throw new Error('List not found');
+      if (!task) {
+        throw new Error('Task not found');
       }
 
-      return tx.lists.update({
+      return tx.tasks.update({
         where: {
-          id: boardId,
+          id: taskId,
         },
         data: {
-          name: dto.name,
+          title: dto.name,
         },
       });
     });
   }
 
-  // lists.service.ts
+  async deleteTask(boardId: string, taskId: string, userId: string) {
+    const user = await this.prisma.board_users.findUnique({
+      where: {
+        board_id_user_id: {
+          board_id: boardId,
+          user_id: userId,
+        },
+      },
+    });
+
+    if (!user) throw new Error('User not found');
+
+    if (user.role !== 'editor')
+      throw new ForbiddenException('Can not edit this board');
+
+    const task = await this.prisma.tasks.findUnique({
+      where: { id: taskId },
+    });
+
+    if (!task) {
+      throw new Error('Task not found');
+    }
+
+    // Transaction để đảm bảo xóa đồng bộ
+    return this.prisma.$transaction(async (tx) => {
+      return await tx.tasks.delete({
+        where: { id: taskId },
+      });
+    });
+  }
+
   async updateListPosition(
-    listId: string,
     boardId,
+    listId,
+    taskId: string,
+    dto: UpdateTaskPositionDto,
     userId,
-    dto: UpdateListPositionDto,
   ) {
     return this.prisma.$transaction(async (tx) => {
       const user = await tx.board_users.findUnique({
@@ -152,6 +171,14 @@ export class ListsService {
       if (user.role !== 'editor')
         throw new ForbiddenException('Can not edit this board');
 
+      const task = await tx.tasks.findUnique({
+        where: { id: taskId },
+      });
+
+      if (!task) {
+        throw new Error('Task not found');
+      }
+
       const list = await tx.lists.findUnique({
         where: { id: listId },
       });
@@ -160,20 +187,30 @@ export class ListsService {
         throw new Error('List not found');
       }
 
+      const targetListId = dto.targetListId ?? listId;
+
+      const targetlist = await tx.lists.findUnique({
+        where: { id: targetListId },
+      });
+
+      if (!targetlist) {
+        throw new Error('List not found');
+      }
+
       let before;
       let after;
 
       // Lấy dữ liệu trước & sau trong transaction
       if (dto.beforeId) {
-        before = await tx.lists.findUnique({
-          where: { id: dto.beforeId },
+        before = await tx.tasks.findFirst({
+          where: { id: dto.beforeId, list_id: targetListId },
           select: { position: true },
         });
       }
 
       if (dto.afterId) {
-        after = await tx.lists.findUnique({
-          where: { id: dto.afterId },
+        after = await tx.tasks.findFirst({
+          where: { id: dto.afterId, list_id: targetListId },
           select: { position: true },
         });
       }
@@ -187,13 +224,13 @@ export class ListsService {
       } else if (after?.position != null) {
         newPosition = after.position - 1;
       } else {
-        throw new Error('Invalid position data');
+        newPosition = 100;
       }
 
       // Cập nhật vị trí list
-      await tx.lists.update({
-        where: { id: listId },
-        data: { position: newPosition },
+      await tx.tasks.update({
+        where: { id: taskId },
+        data: { position: newPosition, list_id: targetListId },
       });
 
       // check and re-Index
@@ -211,21 +248,21 @@ export class ListsService {
       }
 
       if (needReindex) {
-        const lists = await tx.lists.findMany({
-          where: { board_id: boardId },
+        const tasks = await tx.tasks.findMany({
+          where: { list_id: targetListId },
           orderBy: { position: 'asc' },
         });
 
-        for (let i = 0; i < lists.length; i++) {
-          await tx.lists.update({
-            where: { id: lists[i].id },
+        for (let i = 0; i < tasks.length; i++) {
+          await tx.tasks.update({
+            where: { id: tasks[i].id },
             data: { position: (i + 1) * 100 },
           });
         }
       }
 
-      return tx.lists.findMany({
-        where: { board_id: boardId },
+      return tx.tasks.findMany({
+        where: { list_id: targetListId },
         orderBy: { position: 'asc' },
       });
     });

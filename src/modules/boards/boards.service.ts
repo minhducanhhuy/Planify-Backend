@@ -323,6 +323,45 @@ export class BoardsService {
     });
   }
 
+  async deleteBoard(workspaceId: string, boardId: string, userId: string) {
+    return await this.prisma.$transaction(async (tx) => {
+      // Kiểm tra quyền người dùng
+      const user = await tx.workspace_users.findFirst({
+        where: { workspace_id: workspaceId, user_id: userId },
+      });
+
+      if (!user) {
+        throw new Error('User is not found');
+      }
+
+      if (user.role !== 'owner') {
+        throw new ForbiddenException(
+          "User can't deleted this board, just owner can do it",
+        );
+      }
+
+      const memberCount = await tx.board_users.count({
+        where: {
+          board_id: boardId,
+        },
+      });
+
+      if (memberCount >= 1) {
+        throw new Error(
+          "Can't delete this board when have other users in workspace",
+        );
+      }
+      // Xóa luôn các quan hệ liên quan nếu cần
+      await tx.boards.delete({
+        where: { id: boardId, workspace_id: workspaceId },
+      });
+
+      return {
+        message: `${boardId} has deleted successful`,
+      };
+    });
+  }
+
   async kickUsersByEmail(
     workspaceId: string,
     boardId: string,
@@ -415,6 +454,43 @@ export class BoardsService {
       return {
         message: `Kicked ${kickedUsers.length} users to board`,
         users: kickedUsers,
+      };
+    });
+  }
+
+  async leaveBoard(
+    workspaceId: string,
+    boardId: string,
+    currentUserId: string,
+  ) {
+    return await this.prisma.$transaction(async (tx) => {
+      const user = await tx.workspace_users.findUnique({
+        where: {
+          workspace_id_user_id: {
+            workspace_id: workspaceId,
+            user_id: currentUserId,
+          },
+        },
+      });
+
+      if (!user) {
+        throw new Error('User not found in workspace');
+      }
+
+      if (user.role === 'owner') {
+        throw new Error("Owner can't leave this board");
+      }
+
+      await tx.board_users.delete({
+        where: {
+          board_id_user_id: {
+            board_id: boardId,
+            user_id: currentUserId,
+          },
+        },
+      });
+      return {
+        member: `${currentUserId} đã rời board`,
       };
     });
   }
