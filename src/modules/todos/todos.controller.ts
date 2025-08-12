@@ -52,7 +52,7 @@ export class TodosController {
     return this.todosService.getTodoById(boardId, todoId, userId);
   }
 
-  @Get('mytodo')
+  @Get('myTodo')
   async getAllTodo(
     @Param('boardId') boardId: string,
     @Param('taskId') taskId: string,
