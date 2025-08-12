@@ -258,12 +258,14 @@ export class TodosService {
           orderBy: { position: 'asc' },
         });
 
-        for (let i = 0; i < todos.length; i++) {
-          await tx.todos.update({
-            where: { id: todos[i].id },
-            data: { position: (i + 1) * GAP },
-          });
-        }
+        await Promise.all(
+          todos.map((todo, idx) =>
+            tx.todos.update({
+              where: { id: todo.id },
+              data: { position: (idx + 1) * GAP },
+            }),
+          ),
+        );
       }
 
       return tx.todos.findMany({

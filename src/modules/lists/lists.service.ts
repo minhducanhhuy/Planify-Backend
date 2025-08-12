@@ -237,12 +237,14 @@ export class ListsService {
           orderBy: { position: 'asc' },
         });
 
-        for (let i = 0; i < lists.length; i++) {
-          await tx.lists.update({
-            where: { id: lists[i].id },
-            data: { position: (i + 1) * GAP },
-          });
-        }
+        await Promise.all(
+          lists.map((it, idx) =>
+            tx.lists.update({
+              where: { id: it.id },
+              data: { position: (idx + 1) * GAP },
+            }),
+          ),
+        );
       }
 
       return tx.lists.findMany({
