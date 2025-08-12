@@ -39,7 +39,8 @@ export class ListsService {
         _max: { position: true },
       });
 
-      const nextPosition = (maxPosition._max.position || 0) + 100;
+      const GAP = 100;
+      const nextPosition = (maxPosition._max.position || 0) + GAP;
 
       return tx.lists.create({
         data: {
@@ -198,13 +199,14 @@ export class ListsService {
       }
 
       // Tính toán vị trí mới
+      const GAP = 100;
       let newPosition: number;
       if (before?.position != null && after?.position != null) {
         newPosition = (before.position + after.position) / 2;
       } else if (before?.position != null) {
-        newPosition = before.position + 1;
+        newPosition = before.position + GAP;
       } else if (after?.position != null) {
-        newPosition = after.position - 1;
+        newPosition = after.position - GAP;
       } else {
         throw new Error('Invalid position data');
       }
@@ -238,7 +240,7 @@ export class ListsService {
         for (let i = 0; i < lists.length; i++) {
           await tx.lists.update({
             where: { id: lists[i].id },
-            data: { position: (i + 1) * 100 },
+            data: { position: (i + 1) * GAP },
           });
         }
       }

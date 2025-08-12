@@ -43,7 +43,8 @@ export class TasksService {
         _max: { position: true },
       });
 
-      const nextPosition = (maxPosition._max.position || 0) + 100;
+      const GAP = 100;
+      const nextPosition = (maxPosition._max.position || 0) + GAP;
 
       return tx.tasks.create({
         data: {
@@ -223,15 +224,16 @@ export class TasksService {
       }
 
       // Tính toán vị trí mới
+      const GAP = 100;
       let newPosition: number;
       if (before?.position != null && after?.position != null) {
         newPosition = (before.position + after.position) / 2;
       } else if (before?.position != null) {
-        newPosition = before.position + 1;
+        newPosition = before.position + GAP;
       } else if (after?.position != null) {
-        newPosition = after.position - 1;
+        newPosition = after.position - GAP;
       } else {
-        newPosition = 100;
+        newPosition = GAP;
       }
 
       // Cập nhật vị trí list
@@ -263,7 +265,7 @@ export class TasksService {
         for (let i = 0; i < tasks.length; i++) {
           await tx.tasks.update({
             where: { id: tasks[i].id },
-            data: { position: (i + 1) * 100 },
+            data: { position: (i + 1) * GAP },
           });
         }
       }
