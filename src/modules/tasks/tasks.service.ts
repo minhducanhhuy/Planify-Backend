@@ -17,6 +17,7 @@ export class TasksService {
     dto: CreateTaskDto,
     userId: string,
   ) {
+    // Kiểm tra quyền user
     const user = await this.prisma.board_users.findUnique({
       where: {
         board_id_user_id: {
@@ -30,23 +31,30 @@ export class TasksService {
       throw new ForbiddenException('User does not belong to this workspace');
     }
 
-    if (user.role !== 'editor')
+    if (user.role !== 'editor') {
       throw new ForbiddenException(
-        'User do not have enough authority to create a board',
+        'User does not have enough authority to create a task',
       );
+    }
 
-    const currentTaskCount = await this.prisma.tasks.count({
-      where: { list_id: listId },
-    });
+    // Transaction: đọc max position và insert task trong cùng 1 giao dịch
+    return this.prisma.$transaction(async (tx) => {
+      const maxPosition = await tx.tasks.aggregate({
+        where: { list_id: listId },
+        _max: { position: true },
+      });
 
-    return this.prisma.tasks.create({
-      data: {
-        list_id: listId,
-        board_id: boardId,
-        title: dto.name,
-        position: (currentTaskCount + 1) * 100,
-        created_by: userId,
-      },
+      const nextPosition = (maxPosition._max.position || 0) + 100;
+
+      return tx.tasks.create({
+        data: {
+          list_id: listId,
+          board_id: boardId,
+          title: dto.name,
+          position: nextPosition,
+          created_by: userId,
+        },
+      });
     });
   }
 

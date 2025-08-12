@@ -12,6 +12,7 @@ export class ListsService {
   constructor(private prisma: PrismaService) {}
 
   async createList(dto: CreateListDto, userId: string, boardId: string) {
+    // Kiểm tra quyền user
     const user = await this.prisma.board_users.findUnique({
       where: {
         board_id_user_id: {
@@ -25,21 +26,28 @@ export class ListsService {
       throw new ForbiddenException('User does not belong to this workspace');
     }
 
-    if (user.role !== 'editor')
+    if (user.role !== 'editor') {
       throw new ForbiddenException(
-        'User do not have enough authority to create a board',
+        'User does not have enough authority to create a list',
       );
+    }
 
-    const currentListCount = await this.prisma.lists.count({
-      where: { board_id: boardId },
-    });
+    // Transaction để đảm bảo position không trùng
+    return this.prisma.$transaction(async (tx) => {
+      const maxPosition = await tx.lists.aggregate({
+        where: { board_id: boardId },
+        _max: { position: true },
+      });
 
-    return this.prisma.lists.create({
-      data: {
-        name: dto.name,
-        board_id: boardId,
-        position: (currentListCount + 1) * 100,
-      },
+      const nextPosition = (maxPosition._max.position || 0) + 100;
+
+      return tx.lists.create({
+        data: {
+          name: dto.name,
+          board_id: boardId,
+          position: nextPosition,
+        },
+      });
     });
   }
 
