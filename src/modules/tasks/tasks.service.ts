@@ -37,7 +37,6 @@ export class TasksService {
       );
     }
 
-    // Transaction: đọc max position và insert task trong cùng 1 giao dịch
     return this.prisma.$transaction(async (tx) => {
       const maxPosition = await tx.tasks.aggregate({
         where: { list_id: listId },

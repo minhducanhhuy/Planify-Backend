@@ -80,7 +80,7 @@ export class TasksController {
   }
 
   @Delete(':id')
-  async deleteList(
+  async deleteTask(
     @Param('boardId') boardId: string,
     @Param('id') taskId: string,
     @Req() req: Request,
