@@ -7,6 +7,8 @@ import { WorkspacesModule } from './modules/workspaces/workspaces.module';
 import { BoardsModule } from './modules/boards/boards.module';
 import { ListsModule } from './modules/lists/lists.module';
 import { TasksModule } from './modules/tasks/tasks.module';
+import { ItemsModule } from './modules/items/items.module';
+import { TodosModule } from './modules/todos/todos.module';
 
 @Module({
   imports: [
@@ -16,6 +18,8 @@ import { TasksModule } from './modules/tasks/tasks.module';
     BoardsModule,
     ListsModule,
     TasksModule,
+    ItemsModule,
+    TodosModule,
   ],
   controllers: [AppController],
   providers: [AppService],
