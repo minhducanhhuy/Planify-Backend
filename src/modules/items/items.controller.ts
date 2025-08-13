@@ -6,21 +6,16 @@ import {
   Param,
   Patch,
   Post,
-  Req,
-  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { AuthUser } from '../../auth/decorators/auth-user.decorator';
 import { ItemsService } from './items.service';
 import { CreateItemDto } from './dto/CreateItemDto';
-import { get } from 'http';
 import { UpdateItemPositionDto } from './dto/UpdateItemPositionDto';
 
 @UseGuards(JwtAuthGuard)
-@Controller(
-  '/workspaces/:workspaceId/boards/:boardId/lists/:listId/tasks/:idTask/todos/:idTodo/items',
-)
+@Controller('boards/:boardId/todos/:todoId/items')
 export class ItemsController {
   constructor(private readonly itemsService: ItemsService) {}
 
@@ -29,92 +24,65 @@ export class ItemsController {
     @Param('boardId') boardId: string,
     @Param('todoId') todoId: string,
     @Body() dto: CreateItemDto,
-    @Req() req: Request,
+    @AuthUser() user: Express.User,
   ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    const userId = req.user.id;
-    return this.itemsService.createItem(boardId, todoId, dto, userId);
+    return this.itemsService.createItem(boardId, todoId, dto, user.id);
   }
 
-  @Get(':id')
-  async getTodoById(
-    @Param('boardId') boardId: string,
-    @Param('id') itemId: string,
-    @Req() req: Request,
-  ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    const userId = req.user.id;
-    return this.itemsService.getItemById(boardId, itemId, userId);
-  }
-
-  @Get(':myItem')
-  async getAllTodo(
+  @Get('')
+  async getAllItems(
     @Param('boardId') boardId: string,
     @Param('todoId') todoId: string,
-    @Req() req: Request,
+    @AuthUser() user: Express.User,
   ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    const userId = req.user.id;
-    return this.itemsService.getAllItemInTodo(boardId, todoId, userId);
+    return this.itemsService.getAllItemInTodo(boardId, todoId, user.id);
   }
 
-  @Patch(':id/name')
+  @Get(':itemId')
+  async getItemById(
+    @Param('boardId') boardId: string,
+    @Param('todoId') todoId: string,
+    @Param('itemId') itemId: string,
+    @AuthUser() user: Express.User,
+  ) {
+    return this.itemsService.getItemById(boardId, itemId, user.id);
+  }
+
+  @Patch(':itemId/name')
   async setName(
     @Param('boardId') boardId: string,
-    @Param('id') itemId: string,
+    @Param('todoId') todoId: string,
+    @Param('itemId') itemId: string,
     @Body() dto: CreateItemDto,
-    @Req() req: Request,
+    @AuthUser() user: Express.User,
   ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    const userId = req.user.id;
-    return this.itemsService.setNameTodo(boardId, itemId, dto, userId);
+    return this.itemsService.setNameItem(boardId, itemId, dto, user.id);
   }
 
-  @Delete(':id')
-  async deleteTodo(
+  @Delete(':itemId')
+  async deleteItem(
     @Param('boardId') boardId: string,
-    @Param('id') itemId: string,
-    @Req() req: Request,
+    @Param('todoId') todoId: string,
+    @Param('itemId') itemId: string,
+    @AuthUser() user: Express.User,
   ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    const userId = req.user.id;
-    return this.itemsService.deleteItem(boardId, itemId, userId);
+    return this.itemsService.deleteItem(boardId, itemId, user.id);
   }
 
-  @Patch(':id/move')
+  @Patch(':itemId/position')
   async updatePosition(
     @Param('boardId') boardId: string,
     @Param('todoId') todoId: string,
-    @Param('id') itemId: string,
+    @Param('itemId') itemId: string,
     @Body() dto: UpdateItemPositionDto,
-    @Req() req: Request,
+    @AuthUser() user: Express.User,
   ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    const userId = req.user.id;
     return this.itemsService.updateItemPosition(
       boardId,
       todoId,
       itemId,
       dto,
-      userId,
+      user.id,
     );
   }
 }

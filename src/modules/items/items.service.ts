@@ -92,7 +92,7 @@ export class ItemsService {
     });
   }
 
-  async setNameTodo(
+  async setNameItem(
     boardId: string,
     itemId: string,
     dto: CreateItemDto,

@@ -15,14 +15,13 @@ import { CreateTodoDto } from './dto/CreateTodoDto';
 import { UpdateTodoPositionDto } from './dto/UpdateTodoPositionDto';
 
 @UseGuards(JwtAuthGuard)
-@Controller('/boards/:boardId/lists/:listId/tasks/:taskId/todos')
+@Controller('/boards/:boardId/tasks/:taskId/todos')
 export class TodosController {
   constructor(private readonly todosService: TodosService) {}
 
   @Post('')
   async createTodo(
     @Param('boardId') boardId: string,
-    @Param('listId') listId: string,
     @Param('taskId') taskId: string,
     @Body() dto: CreateTodoDto,
     @AuthUser() user: Express.User,
@@ -33,7 +32,6 @@ export class TodosController {
   @Get('')
   async getAllTodos(
     @Param('boardId') boardId: string,
-    @Param('listId') listId: string,
     @Param('taskId') taskId: string,
     @AuthUser() user: Express.User,
   ) {
@@ -43,7 +41,6 @@ export class TodosController {
   @Get(':todoId')
   async getTodoById(
     @Param('boardId') boardId: string,
-    @Param('listId') listId: string,
     @Param('taskId') taskId: string,
     @Param('todoId') todoId: string,
     @AuthUser() user: Express.User,
@@ -54,7 +51,6 @@ export class TodosController {
   @Patch(':todoId/name')
   async setName(
     @Param('boardId') boardId: string,
-    @Param('listId') listId: string,
     @Param('taskId') taskId: string,
     @Param('todoId') todoId: string,
     @Body() dto: CreateTodoDto,
@@ -66,7 +62,6 @@ export class TodosController {
   @Delete(':todoId')
   async deleteTodo(
     @Param('boardId') boardId: string,
-    @Param('listId') listId: string,
     @Param('taskId') taskId: string,
     @Param('todoId') todoId: string,
     @AuthUser() user: Express.User,
@@ -77,7 +72,6 @@ export class TodosController {
   @Patch(':todoId/move')
   async updatePosition(
     @Param('boardId') boardId: string,
-    @Param('listId') listId: string,
     @Param('taskId') taskId: string,
     @Param('todoId') todoId: string,
     @Body() dto: UpdateTodoPositionDto,
