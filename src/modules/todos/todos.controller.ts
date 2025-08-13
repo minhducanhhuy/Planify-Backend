@@ -6,114 +6,89 @@ import {
   Param,
   Patch,
   Post,
-  Req,
-  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { AuthUser } from '../../auth/decorators/auth-user.decorator';
 import { TodosService } from './todos.service';
 import { CreateTodoDto } from './dto/CreateTodoDto';
 import { UpdateTodoPositionDto } from './dto/UpdateTodoPositionDto';
 
 @UseGuards(JwtAuthGuard)
-@Controller(
-  '/workspaces/:workspaceId/boards/:boardId/lists/:listId/tasks/:idTask/todos',
-)
+@Controller('/boards/:boardId/lists/:listId/tasks/:taskId/todos')
 export class TodosController {
   constructor(private readonly todosService: TodosService) {}
 
   @Post('')
   async createTodo(
     @Param('boardId') boardId: string,
+    @Param('listId') listId: string,
     @Param('taskId') taskId: string,
     @Body() dto: CreateTodoDto,
-    @Req() req: Request,
+    @AuthUser() user: Express.User,
   ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    const userId = req.user.id;
-    return this.todosService.createTodo(boardId, taskId, dto, userId);
+    return this.todosService.createTodo(boardId, taskId, dto, user.id);
   }
 
-  @Get(':id')
+  @Get('')
+  async getAllTodos(
+    @Param('boardId') boardId: string,
+    @Param('listId') listId: string,
+    @Param('taskId') taskId: string,
+    @AuthUser() user: Express.User,
+  ) {
+    return this.todosService.getAllTodoInTask(boardId, taskId, user.id);
+  }
+
+  @Get(':todoId')
   async getTodoById(
     @Param('boardId') boardId: string,
-    @Param('id') todoId: string,
-    @Req() req: Request,
-  ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    const userId = req.user.id;
-    return this.todosService.getTodoById(boardId, todoId, userId);
-  }
-
-  @Get('myTodo')
-  async getAllTodo(
-    @Param('boardId') boardId: string,
+    @Param('listId') listId: string,
     @Param('taskId') taskId: string,
-    @Req() req: Request,
+    @Param('todoId') todoId: string,
+    @AuthUser() user: Express.User,
   ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    const userId = req.user.id;
-    return this.todosService.getAllTodoInTask(boardId, taskId, userId);
+    return this.todosService.getTodoById(boardId, todoId, user.id);
   }
 
-  @Patch(':id/name')
+  @Patch(':todoId/name')
   async setName(
     @Param('boardId') boardId: string,
-    @Param('id') todoId: string,
+    @Param('listId') listId: string,
+    @Param('taskId') taskId: string,
+    @Param('todoId') todoId: string,
     @Body() dto: CreateTodoDto,
-    @Req() req: Request,
+    @AuthUser() user: Express.User,
   ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    const userId = req.user.id;
-    return this.todosService.setNameTodo(boardId, todoId, dto, userId);
+    return this.todosService.setNameTodo(boardId, todoId, dto, user.id);
   }
 
-  @Delete(':id')
+  @Delete(':todoId')
   async deleteTodo(
     @Param('boardId') boardId: string,
-    @Param('id') todoId: string,
-    @Req() req: Request,
+    @Param('listId') listId: string,
+    @Param('taskId') taskId: string,
+    @Param('todoId') todoId: string,
+    @AuthUser() user: Express.User,
   ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    const userId = req.user.id;
-    return this.todosService.deleteTodo(boardId, todoId, userId);
+    return this.todosService.deleteTodo(boardId, todoId, user.id);
   }
 
-  @Patch(':id/move')
+  @Patch(':todoId/move')
   async updatePosition(
     @Param('boardId') boardId: string,
+    @Param('listId') listId: string,
     @Param('taskId') taskId: string,
-    @Param('id') todoId: string,
+    @Param('todoId') todoId: string,
     @Body() dto: UpdateTodoPositionDto,
-    @Req() req: Request,
+    @AuthUser() user: Express.User,
   ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    const userId = req.user.id;
     return this.todosService.updateTodoPosition(
       boardId,
       taskId,
       todoId,
       dto,
-      userId,
+      user.id,
     );
   }
 }
