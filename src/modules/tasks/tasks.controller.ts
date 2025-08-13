@@ -6,19 +6,17 @@ import {
   Param,
   Patch,
   Post,
-  Req,
-  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { AuthUser } from '../../auth/decorators/auth-user.decorator';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/CreateTaskDto';
 import { UpdateTaskPositionDto } from './dto/UpdateTaskPositionDto';
 import { UpdateDescriptionDto } from './dto/UpdateDescriptionDto';
 
 @UseGuards(JwtAuthGuard)
-@Controller('/workspaces/:workspaceId/boards/:boardId/lists/:listId/tasks')
+@Controller('/boards/:boardId/lists/:listId/tasks')
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
@@ -27,107 +25,75 @@ export class TasksController {
     @Param('boardId') boardId: string,
     @Param('listId') listId: string,
     @Body() dto: CreateTaskDto,
-    @Req() req: Request,
+    @AuthUser() user: Express.User,
   ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    const userId = req.user.id;
-    return this.tasksService.createTask(boardId, listId, dto, userId);
+    return this.tasksService.createTask(boardId, listId, dto, user.id);
   }
 
-  @Get(':id')
-  async getTaskById(
-    @Param('boardId') boardId: string,
-    @Param('id') taskId: string,
-    @Req() req: Request,
-  ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    const userId = req.user.id;
-    return this.tasksService.getTaskById(boardId, taskId, userId);
-  }
-
-  @Get('mytask')
-  async getAllTask(
+  @Get('')
+  async getAllTasks(
     @Param('boardId') boardId: string,
     @Param('listId') listId: string,
-    @Req() req: Request,
+    @AuthUser() user: Express.User,
   ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    const userId = req.user.id;
-    return this.tasksService.getAllTaskInList(boardId, listId, userId);
+    return this.tasksService.getAllTaskInList(boardId, listId, user.id);
   }
 
-  @Patch(':id/name')
+  @Get(':taskId')
+  async getTaskById(
+    @Param('boardId') boardId: string,
+    @Param('listId') listId: string,
+    @Param('taskId') taskId: string,
+    @AuthUser() user: Express.User,
+  ) {
+    return this.tasksService.getTaskById(boardId, taskId, user.id);
+  }
+
+  @Patch(':taskId/name')
   async setName(
     @Param('boardId') boardId: string,
-    @Param('id') taskId: string,
+    @Param('listId') listId: string,
+    @Param('taskId') taskId: string,
     @Body() dto: CreateTaskDto,
-    @Req() req: Request,
+    @AuthUser() user: Express.User,
   ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    const userId = req.user.id;
-    return this.tasksService.setNameTask(boardId, taskId, dto, userId);
+    return this.tasksService.setNameTask(boardId, taskId, dto, user.id);
   }
 
-  @Patch(':id/description')
+  @Patch(':taskId/description')
   async setDescription(
     @Param('boardId') boardId: string,
-    @Param('id') taskId: string,
+    @Param('listId') listId: string,
+    @Param('taskId') taskId: string,
     @Body() dto: UpdateDescriptionDto,
-    @Req() req: Request,
+    @AuthUser() user: Express.User,
   ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    const userId = req.user.id;
-    return this.tasksService.setDescriptionTask(boardId, taskId, dto, userId);
+    return this.tasksService.setDescriptionTask(boardId, taskId, dto, user.id);
   }
 
-  @Delete(':id')
+  @Delete(':taskId')
   async deleteTask(
     @Param('boardId') boardId: string,
-    @Param('id') taskId: string,
-    @Req() req: Request,
+    @Param('taskId') taskId: string,
+    @AuthUser() user: Express.User,
   ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    const userId = req.user.id;
-    return this.tasksService.deleteTask(boardId, taskId, userId);
+    return this.tasksService.deleteTask(boardId, taskId, user.id);
   }
 
-  @Patch(':id/move')
+  @Patch(':taskId/position')
   async updatePosition(
     @Param('boardId') boardId: string,
     @Param('listId') listId: string,
-    @Param('id') taskId: string,
+    @Param('taskId') taskId: string,
     @Body() dto: UpdateTaskPositionDto,
-    @Req() req: Request,
+    @AuthUser() user: Express.User,
   ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    const userId = req.user.id;
     return this.tasksService.updateListPosition(
       boardId,
       listId,
       taskId,
       dto,
-      userId,
+      user.id,
     );
   }
 }
