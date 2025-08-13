@@ -52,6 +52,18 @@ export class ListsService {
     });
   }
 
+  async getAllLists(userId: string, boardId: string) {
+    const canAccess = await this.prisma.board_users.findFirst({
+      where: { user_id: userId, board_id: boardId },
+    });
+    if (!canAccess)
+      throw new UnauthorizedException('this user can not access to this board');
+
+    return this.prisma.lists.findMany({
+      where: { board_id: boardId },
+    });
+  }
+
   async getListById(userId: string, boardId: string, listId: string) {
     const canAccess = await this.prisma.board_users.findFirst({
       where: { user_id: userId, board_id: boardId },
@@ -64,18 +76,6 @@ export class ListsService {
         board_id: boardId,
         id: listId,
       },
-    });
-  }
-
-  async getAllList(userId: string, boardId: string) {
-    const canAccess = await this.prisma.board_users.findFirst({
-      where: { user_id: userId, board_id: boardId },
-    });
-    if (!canAccess)
-      throw new UnauthorizedException('this user can not access to this board');
-
-    return this.prisma.lists.findMany({
-      where: { board_id: boardId },
     });
   }
 

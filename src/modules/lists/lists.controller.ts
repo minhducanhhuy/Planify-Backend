@@ -14,6 +14,7 @@ import { Request } from 'express';
 import { ListsService } from './lists.service';
 import { CreateListDto } from './dto/CreateListDto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { AuthUser } from '../../auth/decorators/auth-user.decorator';
 import { UpdateListPositionDto } from './dto/UpdateListPositionDto';
 
 @UseGuards(JwtAuthGuard)
@@ -25,81 +26,54 @@ export class ListsController {
   async createList(
     @Param('boardId') boardId: string,
     @Body() dto: CreateListDto,
-    @Req() req: Request,
+    @AuthUser() user: Express.User,
   ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    const userId = req.user.id;
-    return this.listsService.createList(dto, userId, boardId);
+    return this.listsService.createList(dto, user.id, boardId);
   }
 
-  @Get(':id')
+  @Get('')
+  async getAllLists(
+    @Param('boardId') boardId: string,
+    @AuthUser() user: Express.User,
+  ) {
+    return this.listsService.getAllLists(user.id, boardId);
+  }
+
+  @Get(':listId')
   async getListById(
     @Param('boardId') boardId: string,
-    @Param('id') listId: string,
-    @Req() req: Request,
+    @Param('listId') listId: string,
+    @AuthUser() user: Express.User,
   ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    const userId = req.user.id;
-    return this.listsService.getListById(userId, boardId, listId);
+    return this.listsService.getListById(user.id, boardId, listId);
   }
 
-  @Get('myList')
-  async getAllList(@Param('boardId') boardId: string, @Req() req: Request) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    const userId = req.user.id;
-    return this.listsService.getAllList(userId, boardId);
-  }
-
-  @Delete(':id')
+  @Delete(':listId')
   async deleteList(
-    @Param('id') listId: string,
+    @Param('listId') listId: string,
     @Param('boardId') boardId: string,
-    @Req() req: Request,
+    @AuthUser() user: Express.User,
   ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    const userId = req.user.id;
-    return this.listsService.deleteList(listId, boardId, userId);
+    return this.listsService.deleteList(listId, boardId, user.id);
   }
 
-  @Patch(':id/name')
+  @Patch(':listId/name')
   async setName(
-    @Param('id') listId: string,
+    @Param('listId') listId: string,
     @Param('boardId') boardId: string,
     @Body() dto: CreateListDto,
-    @Req() req: Request,
+    @AuthUser() user: Express.User,
   ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    const userId = req.user.id;
-    return this.listsService.setNameList(listId, boardId, userId, dto);
+    return this.listsService.setNameList(listId, boardId, user.id, dto);
   }
 
-  @Patch(':id/move')
+  @Patch(':listId/position')
   async updatePosition(
-    @Param('id') listId: string,
+    @Param('listId') listId: string,
     @Param('boardId') boardId: string,
     @Body() dto: UpdateListPositionDto,
-    @Req() req: Request,
+    @AuthUser() user: Express.User,
   ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    const userId = req.user.id;
-    return this.listsService.updateListPosition(listId, boardId, userId, dto);
+    return this.listsService.updateListPosition(listId, boardId, user.id, dto);
   }
 }
