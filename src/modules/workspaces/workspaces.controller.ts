@@ -94,7 +94,7 @@ export class WorkspacesController {
     );
   }
 
-  @Delete(':workspaceId/leave')
+  @Delete(':workspaceId/members/me')
   async leaveWorkspace(
     @Param('workspaceId') workspaceId: string,
     @AuthUser() user: Express.User,
