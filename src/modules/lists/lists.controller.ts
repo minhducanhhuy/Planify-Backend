@@ -15,7 +15,7 @@ import { AuthUser } from '../../auth/decorators/auth-user.decorator';
 import { UpdateListPositionDto } from './dto/UpdateListPositionDto';
 
 @UseGuards(JwtAuthGuard)
-@Controller('/workspaces/:workspaceId/boards/:boardId/lists')
+@Controller('/boards/:boardId/lists')
 export class ListsController {
   constructor(private readonly listsService: ListsService) {}
 
