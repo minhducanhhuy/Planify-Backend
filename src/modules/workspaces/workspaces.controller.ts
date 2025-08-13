@@ -31,8 +31,8 @@ export class WorkspacesController {
     return this.workspacesService.createWorkspace(dto.name, user.id);
   }
 
-  @Get('myWorkspace')
-  async getMyWorkspaces(@AuthUser() user: Express.User) {
+  @Get('')
+  async getAllWorkspaces(@AuthUser() user: Express.User) {
     return this.workspacesService.getUserWorkspaces(user.id);
   }
 
