@@ -37,7 +37,7 @@ export class BoardsController {
   }
 
   @Get('')
-  async getAllBoard(
+  async getAllBoards(
     @Param('workspaceId') workspaceId: string,
     @AuthUser() user: Express.User,
   ) {
