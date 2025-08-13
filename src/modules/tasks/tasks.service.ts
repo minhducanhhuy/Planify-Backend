@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTaskDto } from './dto/CreateTaskDto';
 import { UpdateTaskPositionDto } from './dto/UpdateTaskPositionDto';
+import { UpdateDescriptionDto } from './dto/UpdateDescriptionDto';
 
 @Injectable()
 export class TasksService {
@@ -121,6 +122,45 @@ export class TasksService {
         },
         data: {
           title: dto.name,
+        },
+      });
+    });
+  }
+  async setDescriptionTask(
+    boardId: string,
+    taskId: string,
+    dto: UpdateDescriptionDto,
+    userId: string,
+  ) {
+    return await this.prisma.$transaction(async (tx) => {
+      const user = await tx.board_users.findUnique({
+        where: {
+          board_id_user_id: {
+            board_id: boardId,
+            user_id: userId,
+          },
+        },
+      });
+
+      if (!user) throw new Error('User not found');
+
+      if (user.role !== 'editor')
+        throw new ForbiddenException('Can not edit this board');
+
+      const task = await tx.tasks.findUnique({
+        where: { id: taskId },
+      });
+
+      if (!task) {
+        throw new Error('Task not found');
+      }
+
+      return tx.tasks.update({
+        where: {
+          id: taskId,
+        },
+        data: {
+          description: dto.content,
         },
       });
     });

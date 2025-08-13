@@ -15,6 +15,7 @@ import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/CreateTaskDto';
 import { UpdateTaskPositionDto } from './dto/UpdateTaskPositionDto';
+import { UpdateDescriptionDto } from './dto/UpdateDescriptionDto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('/workspaces/:workspaceId/boards/:boardId/lists/:listId/tasks')
@@ -77,6 +78,21 @@ export class TasksController {
 
     const userId = req.user.id;
     return this.tasksService.setNameTask(boardId, taskId, dto, userId);
+  }
+
+  @Patch(':id/description')
+  async setDescription(
+    @Param('boardId') boardId: string,
+    @Param('id') taskId: string,
+    @Body() dto: UpdateDescriptionDto,
+    @Req() req: Request,
+  ) {
+    if (!req.user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const userId = req.user.id;
+    return this.tasksService.setDescriptionTask(boardId, taskId, dto, userId);
   }
 
   @Delete(':id')
