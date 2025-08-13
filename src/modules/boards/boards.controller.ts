@@ -8,12 +8,8 @@ import {
   Param,
   Delete,
   UseGuards,
-  NotFoundException,
-  ParseUUIDPipe,
   Query,
-  UnauthorizedException,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard'; // nếu có
 import { BoardsService } from './boards.service';
 import { CreateBoardDto } from './dto/CreateBoardDto';
