@@ -6,11 +6,8 @@ import {
   Param,
   Patch,
   Post,
-  Req,
-  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { ListsService } from './lists.service';
 import { CreateListDto } from './dto/CreateListDto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
