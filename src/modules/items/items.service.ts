@@ -1,6 +1,7 @@
 import {
   ForbiddenException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -272,6 +273,54 @@ export class ItemsService {
         where: { todo_id: todoId },
         orderBy: { position: 'asc' },
       });
+    });
+  }
+
+  async convertItemToTask(
+    boardId: string,
+    todoId: string,
+    itemId: string,
+    userId: string,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const user = await tx.board_users.findUnique({
+        where: {
+          board_id_user_id: {
+            board_id: boardId,
+            user_id: userId,
+          },
+        },
+      });
+
+      if (!user) throw new Error('User not found');
+
+      if (user.role !== 'editor')
+        throw new ForbiddenException('Can not edit this board');
+      // 1. Lấy item
+      const item = await tx.items.findUnique({ where: { id: itemId } });
+      if (!item) throw new NotFoundException('Item not found');
+
+      // 2. Lấy todo để biết listId
+      const todo = await tx.todos.findUnique({ where: { id: todoId } });
+      if (!todo) throw new NotFoundException('Todo not found');
+      if (!todo.task_id) throw new NotFoundException('Task of todo not found');
+
+      const task = await tx.tasks.findUnique({ where: { id: todo.task_id } });
+      if (!task) throw new NotFoundException('Task not found');
+
+      // 3. Tạo task mới
+      const newTask = await tx.tasks.create({
+        data: {
+          title: item.content,
+          list_id: task.list_id,
+          created_by: userId,
+        },
+      });
+
+      // 4. Xóa item cũ
+      await tx.items.delete({ where: { id: itemId } });
+
+      return newTask;
     });
   }
 }

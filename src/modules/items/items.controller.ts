@@ -85,4 +85,20 @@ export class ItemsController {
       user.id,
     );
   }
+
+  @Patch(':itemId/convert-to-task')
+  async convertToTask(
+    @Param('boardId') boardId: string,
+    @Param('todoId') todoId: string,
+    @Param('itemId') itemId: string,
+    @AuthUser() user: Express.User,
+  ) {
+    // service sẽ lo việc lấy item, tạo task trong cùng list và xoá item
+    return this.itemsService.convertItemToTask(
+      boardId,
+      todoId,
+      itemId,
+      user.id,
+    );
+  }
 }
