@@ -20,6 +20,7 @@ import { CreateBoardDto } from './dto/CreateBoardDto';
 import { AddBoardUsersDto } from './dto/AddBoardUsersDto';
 import { UpdateBoardUserRoleDto } from './dto/UpdateBoardUserRoleDto';
 import { KickUsersDto } from './dto/KickUsersDto';
+import { AuthUser } from '../../auth/decorators/auth-user.decorator';
 
 @UseGuards(JwtAuthGuard)
 @Controller('/workspaces/:workspaceId/boards')
@@ -30,65 +31,41 @@ export class BoardsController {
   async createBoard(
     @Param('workspaceId') workspaceId: string,
     @Body() dto: CreateBoardDto,
-    @Req() req: Request,
+    @AuthUser() user: Express.User,
   ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-    const userId = req.user.id;
-    return this.boardsService.createBoard(dto, userId, workspaceId);
+    return this.boardsService.createBoard(dto, user.id, workspaceId);
   }
 
-  @Get(':id')
-  async getBoardById(
-    @Param('workspaceId') workspaceId: string,
-    @Param('id') boardId: string,
-    @Req() req: Request,
-  ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-    const userId = req.user.id;
-    const board = await this.boardsService.getBoardById(
-      userId,
-      workspaceId,
-      boardId,
-    );
-    if (!board) {
-      throw new NotFoundException('Board not found in this workspace');
-    }
-    return board;
-  }
-
-  @Get('myBoard')
+  @Get('')
   async getAllBoard(
     @Param('workspaceId') workspaceId: string,
-    @Req() req: Request,
+    @AuthUser() user: Express.User,
   ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-    const userId = req.user.id;
-    return this.boardsService.getAllBoard(userId, workspaceId);
+    return this.boardsService.getAllBoard(user.id, workspaceId);
   }
 
-  @Get('search')
+  @Get(':boardId')
+  async getBoardById(
+    @Param('workspaceId') workspaceId: string,
+    @Param('boardId') boardId: string,
+    @AuthUser() user: Express.User,
+  ) {
+    return this.boardsService.getBoardById(user.id, workspaceId, boardId);
+  }
+
+  @Get('searchName')
   async searchBoardsByName(
     @Param('workspaceId') workspaceId: string,
     @Query('name') name: string,
-    @Req() req: Request,
+    @AuthUser() user: Express.User,
   ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-    const userId = req.user.id;
-    return this.boardsService.searchBoardsByName(userId, workspaceId, name);
+    return this.boardsService.searchBoardsByName(user.id, workspaceId, name);
   }
 
-  @Post(':id/add')
+  @Post(':boardId/members')
   async addUsersToBoard(
     @Param('workspaceId') workspaceId: string,
-    @Param('id') boardId: string,
+    @Param('boardId') boardId: string,
     @Body() dto: AddBoardUsersDto,
     @Req() req,
   ) {
@@ -100,10 +77,10 @@ export class BoardsController {
     );
   }
 
-  @Patch(':id/role')
+  @Patch(':boardId/members/role')
   async updateUsersRole(
     @Param('workspaceId') workspaceId: string,
-    @Param('id') boardId: string,
+    @Param('boardId') boardId: string,
     @Body() dto: UpdateBoardUserRoleDto,
     @Req() req,
   ) {
@@ -115,23 +92,19 @@ export class BoardsController {
     );
   }
 
-  @Delete(':id')
+  @Delete(':boardId')
   async deleteBoard(
     @Param('workspaceId') workspaceId: string,
-    @Param('id') boardId: string,
-    @Req() req: Request,
+    @Param('boardId') boardId: string,
+    @AuthUser() user: Express.User,
   ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-    const userId = req.user.id;
-    return this.boardsService.deleteBoard(workspaceId, boardId, userId);
+    return this.boardsService.deleteBoard(workspaceId, boardId, user.id);
   }
 
-  @Delete(':id/kick')
+  @Delete(':boardId/members')
   async kickUsers(
     @Param('workspaceId') workspaceId: string,
-    @Param('id') boardId: string,
+    @Param('boardId') boardId: string,
     @Body() dto: KickUsersDto,
     @Req() req,
   ) {
@@ -143,22 +116,18 @@ export class BoardsController {
     );
   }
 
-  @Delete(':id/leave')
+  @Delete(':boardId/members/me')
   async leaveWorkspace(
     @Param('workspaceId') workspaceId: string,
-    @Param('id') boardId: string,
-    @Req() req: Request,
+    @Param('boardId') boardId: string,
+    @AuthUser() user: Express.User,
   ) {
-    if (!req.user) {
-      throw new UnauthorizedException('User not found');
-    }
-    const userId = req.user.id;
-    return this.boardsService.leaveBoard(workspaceId, boardId, userId);
+    return this.boardsService.leaveBoard(workspaceId, boardId, user.id);
   }
 
-  @Patch(':id/name')
+  @Patch(':boardId/name')
   async setNameBoard(
-    @Param('id') boardId: string,
+    @Param('boardId') boardId: string,
     @Body() dto: CreateBoardDto,
     @Req() req,
   ) {
